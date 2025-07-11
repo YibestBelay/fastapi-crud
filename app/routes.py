@@ -1,7 +1,7 @@
 from fastapi import APIRouter,HTTPException
 from typing import List
-from db import books_db
-from models import Book
+from .db import books_db
+from .models import Book
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ def create_book(book:Book):
     for b in books_db:
         if b.id == book.id:
             raise HTTPException(status_code=400, detail=f'book with id {book.id} already exist')
-    books_db.routerend(book)
+    books_db.append(book)
     return book
 
 @router.get('/books/{book_id}',response_model=Book)
