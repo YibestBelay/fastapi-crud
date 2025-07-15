@@ -1,10 +1,11 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from sqlalchemy import Column, Integer, String
+from .database import Base
 
-class Book(BaseModel):
-    id:int
-    title:str
-    author:str
-    description: Optional[str] = None
-    rating: float= Field(..., ge=0, le=5)
+class Book(Base):
+    __tablename__ = "books"
 
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    author = Column(String, nullable=False)
+    description = Column(String)
+    rating = Column(Integer)

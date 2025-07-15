@@ -1,53 +1,51 @@
-from fastapi import APIRouter,HTTPException
-from typing import List
-from .db import books_db
-from .models import Book
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from . import schemas, crud, database
 
 router = APIRouter()
 
-@router.get('/')
-def read_root():
-    return{"message":"Hello, Welcome to my crud Op"}
 
-@router.get('/books/',response_model=List[Book])
-def get_books():
-    return books_db
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@router.post('/books/bulk',response_model=List[Book])
-def create_book(new_books:List[Book]):
-    for book in new_books:
-         if any(b.id == book.id for b in books_db):
-                raise HTTPException(status_code=400, detail=f'book with id {book.id} already exist')
-    books_db.extend(new_books)
-    return new_books
 
-@router.post('/books/',response_model=Book)
-def create_book(book:Book):
-    for b in books_db:
-        if b.id == book.id:
-            raise HTTPException(status_code=400, detail=f'book with id {book.id} already exist')
-    books_db.append(book)
+@router.post("/books/", response_model=schemas.BookResponse)
+def create_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
+    created = crud.create_book(db=db, book=book)
+    if created is None:
+        raise HTTPException(status_code=400, detail="Book with this title already exists")
+    return created
+
+
+@router.get("/books/", response_model=list[schemas.BookResponse])
+def read_books(db: Session = Depends(get_db)):
+    return crud.get_all_books(db)
+
+
+@router.get("/books/{book_id}", response_model=schemas.BookResponse)
+def read_book(book_id: int, db: Session = Depends(get_db)):
+    db_book = crud.get_book_by_id(db, book_id)
+    if db_book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return db_book
+
+
+@router.delete("/books/{book_id}", response_model=schemas.BookResponse)
+def delete_book(book_id: int, db: Session = Depends(get_db)):
+    book = crud.delete_book(db, book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
     return book
 
-@router.get('/books/{book_id}',response_model=Book)
-def get_book(book_id:int):
-    for book in books_db:
-        if book.id == book_id:
-            return book
-    raise HTTPException(status_code='404',detail='Book not found')    
 
-@router.put('/books/{book_id}',response_model=Book)
-def update_book(book_id:int , updated_book: Book):
-    for index,book in enumerate(books_db):
-        if book.id == book_id:
-            books_db[index] = updated_book
-            return updated_book
-    raise HTTPException(status_code='404',detail='Book not found') 
+@router.put("/books/{book_id}", response_model=schemas.BookResponse)
+def update_book(book_id: int, book: schemas.BookCreate, db: Session = Depends(get_db)):
+    updated = crud.update_book(db, book_id, book)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return updated
 
-@router.delete('/books/{book_id}')
-def delete_book(book_id:int ):
-    for index,book in enumerate(books_db):
-        if book.id == book_id:
-            del books_db[index] 
-            return {"message": f"Book with Title {book.title} has been deleted"}
-    raise HTTPException(status_code='404',detail='Book not found')
